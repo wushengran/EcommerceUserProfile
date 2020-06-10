@@ -110,6 +110,24 @@ public class GrowthEtl {
             everyDayCountVos.add(everyDayCountVo);
         }
 
+        // 4. 求出七天前，再之前的所有订单流水总和
+        String preGmvSql = "select sum(origin_price) as totalGmv from ecommerce.t_order where create_time < '%s'";
+        preGmvSql = String.format(preGmvSql, DateUtil.DateToString( sevenDayBefore, DateStyle.YYYY_MM_DD_HH_MM_SS ));
+        Dataset<Row> preGmvDs = session.sql(preGmvSql);
+        // 只是一个double类型的结果，取出来
+        double previousGmv = preGmvDs.collectAsList().get(0).getDouble(0);
+        BigDecimal preGmv = BigDecimal.valueOf(previousGmv);
+
+        // 5. 遍历之前得到的每天数据，在preGmv的基础上叠加，得到gmv的总量
+        BigDecimal currentGmv = preGmv;
+        for( int i = 0; i < everyDayCountVos.size(); i++ ){
+            // 获取每天的统计数据
+            EveryDayCountVo everyDayCountVo = everyDayCountVos.get(i);
+            currentGmv = currentGmv.add(everyDayCountVo.getGmv());     // 加上当前day的gmv新增量
+
+            everyDayCountVo.setGmv(currentGmv);
+        }
+
         return everyDayCountVos;
     }
 }
